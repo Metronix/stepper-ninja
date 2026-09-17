@@ -1,35 +1,43 @@
 #include "config.h"
 // ============================================================
-// Breakout Board HAL Module - Trialbot
-// Arquivo correspondente: test_board.h
-// Gerado automaticamente pelo Stepper Ninja Board Configurator
+// Breakout Board HAL Template (USER)
+//
+// How to use:
+// 1) Copy this file to: breakoutboard_hal_<ID>.c
+// 2) Change the compile guard below to: #if breakout_board == <ID>
+// 3) Add a matching #elif branch in analog-ninja.c:
+//      #elif breakout_board == <ID>
+//      #include "modules/breakoutboard_hal_<ID>.c"
+//
+// Each board module defines exactly three functions with these
+// common names (no board-number suffix needed):
+//   bb_hal_setup_pins(), bb_hal_process_recv(), bb_hal_process_send()
+//
+// This file is expected to be included into analog-ninja.c after
+// module_data_t and global rx_buffer/tx_buffer are defined.
 // ============================================================
 
-#if breakout_board == 0
+#if breakout_board == 42
 
 #ifdef in_pin_names
-static const char *bb_custom_in_names[] = in_pin_names;
+static const char *bb42_input_names[] = in_pin_names;
 #else
-static const char *bb_custom_in_names[] = {
-    "pause",
-    "estop",
-    "fim-curso",
-    "probe",
-    "arc-ok",
-    "up",
-    "down"
+static const char *bb42_input_names[] = {
+    "pause", "estop", "fim-curso", "probe", "arc-ok", "up", "down"
 };
 #endif
 
 #ifdef out_pin_names
-static const char *bb_custom_out_names[] = out_pin_names;
+static const char *bb42_output_names[] = out_pin_names;
 #else
-static const char *bb_custom_out_names[] = {
-    "arc-enable",
-    "aux-out",
-    "status_connection"
+static const char *bb42_output_names[] = {
+    "arc-enable", "aux-out"
 };
 #endif
+
+enum {
+    BB42_IN_PINS_NO = in_pins_no,
+};
 
 static void add_pin_aliases(const char *name, int is_inverted)
 {
@@ -110,55 +118,30 @@ static int bb_hal_setup_pins(module_data_t *d, int j, int comp_id,
 {
     int r;
 
-    // --- Entradas Digitais (Pico -> LinuxCNC) ---
-    for (int i = 0; i < in_pins_no; i++) {
+    // --- Entradas Digitais (do Pico para o LinuxCNC) ---
+    for (int i = 0; i < BB42_IN_PINS_NO; i++) {
+        // Pinos normais (true quando pino está High)
         memset(name, 0, nsize);
-        if (i < (int)(sizeof(bb_custom_in_names) / sizeof(bb_custom_in_names[0])) &&
-            bb_custom_in_names[i] && strlen(bb_custom_in_names[i]) > 0) {
-            snprintf(name, nsize, module_name ".%d.%s", j, bb_custom_in_names[i]);
-        } else {
-            snprintf(name, nsize, module_name ".%d.input.gp%d", j, input_pins[i]);
-        }
+        snprintf(name, nsize, module_name ".%d.%s", j, bb42_input_names[i]);
         r = hal_pin_bit_newf(HAL_OUT, &d->input[i], comp_id, name, j);
-        if (r < 0) {
-            rtapi_print_msg(RTAPI_MSG_ERR,
-                module_name ".%d: ERROR: pin connected export failed with err=%i\n", j, r);
-            return r;
-        }
+        if (r < 0) return r;
         add_pin_aliases(name, 0);
 
+        // Pinos invertidos (true quando pino está Low)
         memset(name, 0, nsize);
-        if (i < (int)(sizeof(bb_custom_in_names) / sizeof(bb_custom_in_names[0])) &&
-            bb_custom_in_names[i] && strlen(bb_custom_in_names[i]) > 0) {
-            snprintf(name, nsize, module_name ".%d.%s-not", j, bb_custom_in_names[i]);
-        } else {
-            snprintf(name, nsize, module_name ".%d.input.gp%d-not", j, input_pins[i]);
-        }
+        snprintf(name, nsize, module_name ".%d.%s-not", j, bb42_input_names[i]);
         r = hal_pin_bit_newf(HAL_OUT, &d->input_not[i], comp_id, name, j);
-        if (r < 0) {
-            rtapi_print_msg(RTAPI_MSG_ERR,
-                module_name ".%d: ERROR: pin connected export failed with err=%i\n", j, r);
-            return r;
-        }
+        if (r < 0) return r;
         add_pin_aliases(name, 1);
     }
 
-    // --- Saídas Digitais (LinuxCNC -> Pico) ---
+    // --- Saídas Digitais (do LinuxCNC para o Pico) ---
     for (int i = 0; i < out_pins_no; i++) {
         memset(name, 0, nsize);
-        if (i < (int)(sizeof(bb_custom_out_names) / sizeof(bb_custom_out_names[0])) &&
-            bb_custom_out_names[i] && strlen(bb_custom_out_names[i]) > 0) {
-            snprintf(name, nsize, module_name ".%d.%s", j, bb_custom_out_names[i]);
-        } else {
-            snprintf(name, nsize, module_name ".%d.output.gp%d", j, output_pins[i]);
-        }
+        snprintf(name, nsize, module_name ".%d.%s", j, bb42_output_names[i]);
         r = hal_pin_bit_newf(HAL_IN, &d->output[i], comp_id, name, j);
-        if (r < 0) {
-            rtapi_print_msg(RTAPI_MSG_ERR,
-                module_name ".%d: ERROR: pin connected export failed with err=%i\n", j, r);
-            return r;
-        }
-        *d->output[i] = 0;
+        if (r < 0) return r;
+        *d->output[i] = 0; // Inicia em estado seguro
         add_pin_aliases(name, 0);
     }
 
@@ -167,31 +150,28 @@ static int bb_hal_setup_pins(module_data_t *d, int j, int comp_id,
 
 static void bb_hal_process_recv(module_data_t *d)
 {
-    for (uint8_t i = 0; i < in_pins_no; i++) {
-        if (input_pins[i] < 32) {
-            *d->input[i] = (rx_buffer->inputs[0] >> (input_pins[i] & 31)) & 1;
-        } else {
-            *d->input[i] = (rx_buffer->inputs[1] >> ((input_pins[i] - 32) & 31)) & 1;
-        }
-        *d->input_not[i] = !(*d->input[i]);
+    // Desempacota as entradas recebidas do Pico (rx_buffer->inputs[0])
+    uint32_t value = rx_buffer->inputs[0];
+
+    for (uint8_t i = 0; i < BB42_IN_PINS_NO; i++) {
+        uint8_t bit = (value >> i) & 1u;
+        *d->input[i] = bit;
+        *d->input_not[i] = !bit;
     }
 }
 
 static void bb_hal_process_send(module_data_t *d)
 {
-    uint32_t outs0 = 0;
-    uint32_t outs1 = 0;
+    // Empacota os comandos do LinuxCNC para o pacote UDP (tx_buffer->outputs[0])
+    uint32_t outs = 0;
 
     for (uint8_t i = 0; i < out_pins_no; i++) {
-        if (i < 32) {
-            outs0 |= *d->output[i] == 1 ? 1u << i : 0;
-        } else {
-            outs1 |= *d->output[i] == 1 ? 1u << (i & 31) : 0;
+        if (*d->output[i]) {
+            outs |= (1u << i);
         }
     }
 
-    tx_buffer->outputs[0] = outs0;
-    tx_buffer->outputs[1] = outs1;
+    tx_buffer->outputs[0] = outs;
 }
 
-#endif // breakout_board == 0
+#endif // breakout_board == 42

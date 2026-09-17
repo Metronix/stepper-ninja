@@ -12,7 +12,7 @@
     #define DEFAULT_IP {192, 168, 0, 177}
     #define DEFAULT_PORT 8888
     #define DEFAULT_GATEWAY {192, 168, 0, 1}
-    #define DEFAULT_SUBNET {255, 255, 255, 0}
+    #define DEFAULT_SUBNET {255, 255, 252, 0}
     // timeout for detecting disconnection from linuxcnc
     #define DEFAULT_TIMEOUT 1000000
 

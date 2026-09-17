@@ -50,7 +50,7 @@
 #define GP34 34
 #define GP35 35
 #define GP36 36
-#define GP37 38
+#define GP37 37
 #define GP38 38
 #define GP39 39
 #define GP40 40
@@ -90,14 +90,39 @@
 #define    GP_38  20  /*!< B+, Pin J8-38  */
 #define    GP_40  21   /*!< B+, Pin J8-40  */
 
-// SPI port definition (GPIO)
-#define SPI_PORT        spi0
+// SPI port definition (GPIO) & DMA DREQ
+#ifndef SPI_PORT_SELECT
+#define SPI_PORT_SELECT 0
+#endif
+
+#if SPI_PORT_SELECT == 1
+    #define SPI_PORT    spi1
+    #define SPI_DREQ_TX DREQ_SPI1_TX
+    #define SPI_DREQ_RX DREQ_SPI1_RX
+#else
+    #define SPI_PORT    spi0
+    #define SPI_DREQ_TX DREQ_SPI0_TX
+    #define SPI_DREQ_RX DREQ_SPI0_RX
+#endif
+
+#ifndef GPIO_MISO
 #define GPIO_MISO       GP16
+#endif
+#ifndef GPIO_CS
 #define GPIO_CS         GP17
+#endif
+#ifndef GPIO_SCK
 #define GPIO_SCK        GP18
+#endif
+#ifndef GPIO_MOSI
 #define GPIO_MOSI       GP19
-#define GPIO_RESET      GP00
+#endif
+#ifndef GPIO_RESET
+#define GPIO_RESET      GP20
+#endif
+#ifndef GPIO_INT
 #define GPIO_INT        GP21
+#endif
 
 // PICO pin to GPIO
 #define PIN_NULL GP_NULL
@@ -117,20 +142,19 @@
 #define PIN_17 GP13
 #define PIN_19 GP14
 #define PIN_20 GP15
-#define PIN_21 GPIO_MISO
-#define PIN_22 GPIO_CS
-#define PIN_23 GPIO_SCK
-#define PIN_25 GPIO_MOSI
-#define PIN_26 GPIO_RESET
-#define PIN_27 GPIO_INT
-//#define PIN_26 20
-//#define PIN_27 21
-#define PIN_29 22
-#define PIN_31 26
-#define PIN_32 27
-#define PIN_34 28 
+#define PIN_21 GP16
+#define PIN_22 GP17
+#define PIN_24 GP18
+#define PIN_23 PIN_24 // Alias de compatibilidade retroativa
+#define PIN_25 GP19
+#define PIN_26 GP20
+#define PIN_27 GP21
+#define PIN_29 GP22
+#define PIN_31 GP26
+#define PIN_32 GP27
+#define PIN_34 GP28 
 
-#define LED_GPIO      GP25
+#define LED_GPIO      GP19
 
 #define IMR_RECV      0x04
 #define Sn_IMR_RECV   0x04

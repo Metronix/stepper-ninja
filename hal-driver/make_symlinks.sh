@@ -24,8 +24,8 @@ create_link() {
         echo "Backed up existing file: $link_name -> $(basename "$backup_path")"
     fi
 
-    ln -s "$target_abs" "$link_path"
-    echo "Linked $link_name -> $target_rel"
+    ln -s "../$target_rel" "$link_path"
+    echo "Linked $link_name -> ../$target_rel"
 }
 
 create_link "firmware/inc/config.h" "config.h"
@@ -36,5 +36,6 @@ create_link "firmware/modules/inc/jump_table.h" "jump_table.h"
 create_link "firmware/modules/inc/pio_settings.h" "pio_settings.h"
 create_link "firmware/modules/inc/transmission.h" "transmission.h"
 create_link "firmware/modules/transmission.c" "transmission.c"
+create_link "firmware/inc/boards" "boards"
 
 echo "Shared symlinks are ready."

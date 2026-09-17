@@ -4,7 +4,7 @@
 #include "hardware/gpio.h"
 #include "breakoutboard.h"
 
-#if breakout_board > 0
+#if breakout_board > 0 && defined(I2C_PORT)
 void i2c_setup(void) {
     i2c_init(I2C_PORT, 400 * 1000);
     gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);

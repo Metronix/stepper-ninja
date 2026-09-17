@@ -1,84 +1,102 @@
 #ifndef CONFIG_H
 #define CONFIG_H
-#include "internals.h"
 
-    // **************************************************************************
-    // ** This file contains the configuration for the stepper ninja project   **
-    // ** if you want to use pins instead of GPIO use PIN_1, PIN_2, PIN_4, ... **
-    // **************************************************************************
+// ==============================================================================
+// STEPPER NINJA - CONFIGURAÇÃO GERAL DO SISTEMA
+// ==============================================================================
 
-    // default network settings after you flash the PICO
-    #define DEFAULT_MAC {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56}
-    #define DEFAULT_IP {192, 168, 0, 177}
-    #define DEFAULT_PORT 8888
-    #define DEFAULT_GATEWAY {192, 168, 0, 1}
-    #define DEFAULT_SUBNET {255, 255, 255, 0}
-    // timeout for detecting disconnection from linuxcnc
-    #define DEFAULT_TIMEOUT 1000000
+// ------------------------------------------------------------------------------
+// 1. CONFIGURAÇÕES DE REDE (ETHERNET / W5500)
+// ------------------------------------------------------------------------------
+#define DEFAULT_MAC     {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56}
+#define DEFAULT_IP {192, 168, 69, 160}
+#define DEFAULT_PORT 8888
+#define DEFAULT_GATEWAY {192, 168, 69, 1}
+#define DEFAULT_SUBNET {255, 255, 252, 0} // 255.255.252.0 Senão o Pico não é encontrado pelo linux
+#define DEFAULT_TIMEOUT 1000000 // Timeout de detecção de perda de conexão (em microssegundos = 1s)
 
-    // switch off this option (breakout_board 0) to use custom configuration
-    #define breakout_board 0 // 1 = stepper-ninia v1.0 breakout board  
-                             // 2 = io-ninja IO breakout board (96 input, 32 output using 8 MCP23017)
-                             // 3 = analog-ninja breakout board (6x bipolar analog output using 6 MCP4725 and 6x high speed encoder counter) !!!! not implemented yet
-                             // 100 = breakoutboard_100 (4 stepgen, 2 encoder, 32 input, 16 output using MCP23017)
-                             // 0 = no breakout board, use custom pin configuration
+// ------------------------------------------------------------------------------
+// 2. TRANSPORTE DE COMUNICAÇÃO & BARRAMENTO SPI
+// ------------------------------------------------------------------------------
+// 0 = Ethernet UDP via chip WIZnet W5500/W5100S
+// 1 = SPI direto com Raspberry Pi (usando bcm2835)
+#define raspberry_pi_spi 0
 
-#if breakout_board < 1 
+// Instância de SPI de hardware do Pico (0 = spi0, 1 = spi1):
+#define SPI_PORT_SELECT 0
 
-    #define io_expanders 0 // how many IO expander you connected to the breakout board (16 Input + 8 output each max 3 io_expanders)
-   // all pin alias is defined in the internals.h if you want to use instead of using GPIO numbers
-    // All GPIO form 0-15 and 22-31 are usable
-    #define stepgens 4
-    
-    // defined with PINS
-    #define stepgen_steps {PIN_1, PIN_4, PIN_6, PIN_9}
-    #define stepgen_dirs {PIN_2, PIN_5, PIN_7, PIN_10}
-    #define step_invert {0, 0, 0, 0, 0} // step pin invert for each stepgen (0 = not inverted, 1 = inverted)
-    
-    #define encoders 3
-    #define enc_pins {PIN_14, PIN_14, PIN_14} // uses 2 pins, you need to set the first pin (PIN_11 + PIN_12)
-    #define enc_index_pins {PIN_12, PIN_NULL, PIN_NULL}  // pin the encoder index is connected (interrupt driven)
-    #define enc_index_active_level {high, high, high}
+// Pinos de hardware do barramento SPI (podem usar spi0 ou spi1):
+#define GPIO_MISO 0
+#define GPIO_CS 1
+#define GPIO_SCK 2
+#define GPIO_MOSI 3
+#define GPIO_RESET 4
+#define GPIO_INT 5
 
-    #define in_pins {PIN_29, PIN_31, PIN_32, PIN_34} // Free GPIO for inputs (GPIO 22-28)
-    #define in_pullup {1, 1, 1, 1}
-
-    #define out_pins {PIN_11}
-
-    // if you want to use the module with pwm output, set this to 1
-    #define use_pwm 0 // use of pwm output
-    #define pwm_count 1
-    #define pwm_pin {PIN_NULL} // PWM GPIO for the module (GPIO 13, GPIO 14)
-    #define pwm_invert {0} // Invert the PWM signal (1 = inverted, 0 = not inverted)
-    #define default_pwm_frequency 10000 // default pwm frequency in Hz if not specified in the HAL configuration
-    #define default_pwm_maxscale 4096 // default pwm max scale if not specified in the HAL configuration
-    #define default_pwm_min_limit 0 // default pwm min limit if not specified in the HAL configuration
-
-#endif // breakout_board < 1
-
-    #define raspberry_pi_spi 0 // if you want to use the stepper-ninja with Raspberry Pi SPI interface, set this to 1 (need a normal pico)
-
-    // used gpio for SPI on the RPI: 8, 9, 10, 11
-    // used gpio for SPI on the PICO: 16, 17, 18, 19
-    // available GPIO left side:  2,3,4,17,27,33,0,5,6,13,19,26
-    // available GPIO right side: 14,15,18,23,24,25,1,12,16,20,21
+#if raspberry_pi_spi == 1
     #define raspi_int_out 25
     #define raspi_inputs {2, 3, 4, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 27}
     #define raspi_input_pullups {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
     #define raspi_outputs {0, 1, 5, 6, 12, 13, 19, 26}
-    // if you are using raspberry pi SPI instead of Wizchip you get the GP20, GP21 free on the PICO
+#endif
 
-    #define default_pulse_width 2500 // default pulse width in nanoseconds, for the stepgen if not specified in the HAL configuration
-    #define default_step_scale 1000 // default step scale in steps/unit for the stepgen if not specified in the HAL configuration
-    
-    #define use_timer_interrupt 0 // Use a timer interrupt with a 3-slot step ring buffer to smooth PC transmission jitter for step commands    
+#include "internals.h"
 
-    #ifndef encoder_pio_version
-    #define encoder_pio_version ENCODER_PIO_SUBSTEP // 0 = old quadrature encoder PIO, 1 = substep encoder PIO
-    #endif
+// ------------------------------------------------------------------------------
+// 3. SELEÇÃO DA PLACA / PERFIL DE HARDWARE (BOARD PROFILE)
+// ------------------------------------------------------------------------------
+// Escolha a placa desejada definindo SELECTED_BOARD:
+#define BOARD_CUSTOM            0  // Placa customizada (configure em boards/board_custom.h)
+#define BOARD_STEPPER_NINJA_V1  1  // Stepper Ninja Breakout Board v1.0
+#define BOARD_IO_NINJA          2  // IO Ninja (96 in / 32 out via MCP23017)
+#define BOARD_ANALOG_NINJA      3  // Analog Ninja (MCP4725 DACs)
+#define BOARD_100             100  // Breakout Board 100
+#define BOARD_CHINESE_BOB       4  // Placa Paralela Chinesa 5 eixos (DB25 Mach3)
+#define BOARD_PICOBOB_DLX       5  // PicoBOB-DLX
+#define BOARD_USER_TEMPLATE   255  // Template para nova placa com expansores
 
-    #define KBMATRIX
+// Defina a placa ativa (padrão: BOARD_CUSTOM)
+#ifndef SELECTED_BOARD
+#define SELECTED_BOARD BOARD_CUSTOM
+#endif
+
+#ifndef CUSTOM_BOARD_FILE
+#define CUSTOM_BOARD_FILE "boards/test_board.h"
+#endif
+
+// Inclusão automática do perfil de placa escolhido
+#if SELECTED_BOARD == BOARD_CUSTOM
+    #include CUSTOM_BOARD_FILE
+#elif SELECTED_BOARD == BOARD_STEPPER_NINJA_V1
+    #include "boards/board_stepper_ninja_v1.h"
+#elif SELECTED_BOARD == BOARD_IO_NINJA
+    #include "boards/board_io_ninja.h"
+#elif SELECTED_BOARD == BOARD_ANALOG_NINJA
+    #include "boards/board_analog_ninja.h"
+#elif SELECTED_BOARD == BOARD_100
+    #include "boards/board_100.h"
+#elif SELECTED_BOARD == BOARD_CHINESE_BOB
+    #include "boards/board_chinese_bob.h"
+#elif SELECTED_BOARD == BOARD_PICOBOB_DLX
+    #include "boards/board_picobob_dlx.h"
+#elif SELECTED_BOARD == BOARD_USER_TEMPLATE
+    #include "boards/board_user_template.h"
+#else
+    #error "Placa desconhecida selecionada em SELECTED_BOARD!"
+#endif
+
+// ------------------------------------------------------------------------------
+// 4. OPÇÕES AVANÇADAS / EXPERIMENTAIS
+// ------------------------------------------------------------------------------
+#define use_timer_interrupt 0 // Timer interrupt com ring buffer de 3 slots para jitter smoothing
+
+#ifndef encoder_pio_version
+#define encoder_pio_version ENCODER_PIO_SUBSTEP // 0 = encoder PIO legado, 1 = substep encoder PIO
+#endif
+
+#define KBMATRIX
 
 #include "footer.h"
 #include "kbmatrix.h"
-#endif
+
+#endif // CONFIG_H

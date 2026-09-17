@@ -175,18 +175,22 @@ typedef struct {
     uint8_t checksum_index;
     uint8_t checksum_index_in;
     uint8_t checksum_error;
+#if encoders > 0
     float enc_prev_pos[encoders];
     uint32_t enc_timestamp[encoders];
     int32_t enc_offset[encoders];
     uint32_t delta_time[encoders];
+#endif
     int64_t prev_pos[6];
     int64_t curr_pos[6];
     bool watchdog_running;
     bool error_triggered;
     bool first_data;
+#if encoders > 0
     float delta_pos[encoders];
     int32_t delta_count[encoders];
     int32_t delta_count_accum[encoders];
+#endif
     uint8_t tx_counter;
 } module_data_t;
 
@@ -250,6 +254,7 @@ float lpf_update(LowPassFilter *f, float x)
     return f->y;
 }
 
+#if encoders > 0
 static void update_encoder_velocity_from_deltas(module_data_t *d, uint8_t encoder_index)
 {
     if (d->delta_time[encoder_index] == 0) {
@@ -267,6 +272,7 @@ static void update_encoder_velocity_from_deltas(module_data_t *d, uint8_t encode
 
     *d->enc_rpm[encoder_index] = (*d->enc_velocity[encoder_index]) * 60.0f;
 }
+#endif
 
 static void module_init(void)
 {
@@ -435,6 +441,8 @@ static void printbuf(uint8_t *buf, size_t len)
 #include "modules/breakoutboard_hal_2.c"
 #elif breakout_board == 3
 #include "modules/breakoutboard_hal_3.c"
+#elif breakout_board == 42
+#include "modules/breakoutboard_hal_42.c"
 #elif breakout_board == 100
 #include "modules/breakoutboard_hal_100.c"
 #else
@@ -451,7 +459,7 @@ static int _send(void *arg)
 {
     #if raspberry_pi_spi == 0
         module_data_t *d = arg;
-        return sendto(d->sockfd, tx_buffer, tx_size, MSG_DONTROUTE | MSG_DONTWAIT, &d->remote_addr, sizeof(d->remote_addr));
+        return sendto(d->sockfd, tx_buffer, tx_size, MSG_DONTWAIT, &d->remote_addr, sizeof(d->remote_addr));
     #else
         bcm2835_gpio_clr(raspi_int_out);
         memset(spi_tx_buffer, 0, sizeof(spi_tx_buffer));
@@ -876,7 +884,7 @@ int rtapi_app_main(void)
         #endif
 
         uint32_t nsize = sizeof(name);
-        PIN_BIT(&hal_data[j].connected, HAL_IN, module_name ".%d.connected", j);
+        PIN_BIT(&hal_data[j].connected, HAL_OUT, module_name ".%d.connected", j);
 
         #if stepgens > 0
         PIN_U32_INIT(&hal_data[j].pulse_width, HAL_IN, default_pulse_width, module_name ".%d.stepgen.pulse-width", j);
@@ -1012,6 +1020,16 @@ int rtapi_app_main(void)
             return r;
         }
         rtapi_print_msg(RTAPI_MSG_INFO, module_name ".%d: hal_export_funct for process_recv: %d\n", j, r);
+
+        // Also export under alternate module name (stepgen-ninja <-> stepper-ninja) for compatibility
+        const char *alt_mod = (strcmp(module_name, "stepper-ninja") == 0) ? "stepgen-ninja" : "stepper-ninja";
+        char alt_func[64];
+        snprintf(alt_func, sizeof(alt_func), "%s.%d.watchdog-process", alt_mod, j);
+        hal_export_funct(alt_func, watchdog_process, &hal_data[j], 1, 1, comp_id);
+        snprintf(alt_func, sizeof(alt_func), "%s.%d.process-send", alt_mod, j);
+        hal_export_funct(alt_func, udp_io_process_send, &hal_data[j], 1, 1, comp_id);
+        snprintf(alt_func, sizeof(alt_func), "%s.%d.process-recv", alt_mod, j);
+        hal_export_funct(alt_func, udp_io_process_recv, &hal_data[j], 1, 1, comp_id);
     }
 
     r = hal_ready(comp_id);

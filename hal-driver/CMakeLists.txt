@@ -54,11 +54,11 @@ function(add_linuxcnc_rt_module module_name source_name)
     set(module_makefile_template [=[
 obj-m += @module_name@.o
 include @LINUXCNC_MODINC@
-EXTRA_CFLAGS += -I@CMAKE_CURRENT_SOURCE_DIR@
+EXTRA_CFLAGS += -I../..
 EXTRA_CFLAGS += -I@LINUXCNC_INCLUDE_DIR@
 EXTRA_CFLAGS += -DMODULE_NAME=\"@module_name@\"
 
-@module_name@.o: @module_source@
+@module_name@.o: @source_name@
 	$(ECHO) Compiling realtime $<
 	$(Q)$(CC) -o $@ $(EXTRA_CFLAGS) -c $<
 ]=])
@@ -69,6 +69,7 @@ EXTRA_CFLAGS += -DMODULE_NAME=\"@module_name@\"
     add_custom_command(
         OUTPUT "${module_output}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${module_build_dir}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${module_source}" "${module_build_dir}/${source_name}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${module_build_dir}"
                 "${LINUXCNC_MAKE_PROGRAM}" "CC=${CMAKE_C_COMPILER}" -f "${module_makefile}" modules
         DEPENDS

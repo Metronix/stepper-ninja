@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stepper Ninja - Board Configurator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <img src="pico icon/pico_icon4.png" alt="Logo" width="60 height=" 60 </div>
+          <div>
+            <h1>Stepper Ninja</h1>
+            <span class="subtitle">Board & Pinout Configurator</span>
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div class="board-meta-box">
+            <div class="meta-field">
+              <label for="boardName">Nome da Placa:</label>
+              <input type="text" id="boardName" placeholder="Ex: Minha Placa CNC" value="Custom GPIO Board">
+            </div>
+            <div class="meta-field">
+              <label for="boardFilename">Arquivo:</label>
+              <input type="text" id="boardFilename" value="board_custom.h"
+                title="Arquivo de destino em firmware/inc/boards/">
+            </div>
+          </div>
+
+          <div class="preset-selector">
+            <label for="presetSelect">Carregar Preset:</label>
+            <select id="presetSelect">
+              <option value="">-- Placas Prontas --</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="btnSave" class="btn btn-primary">
+            <span class="btn-icon">💾</span> Salvar
+          </button>
+          <button id="btnBuild" class="btn btn-success">
+            Compilar (.uf2)
+          </button>
+        </div>
+    </header>
+
+    <!-- Conflict Warning Banner -->
+    <div id="conflictBanner" class="conflict-banner hidden">
+      <span class="banner-icon">⚠️</span>
+      <div class="banner-text" id="conflictText">Conflito de pinos detectado!</div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <main class="main-grid">
+      <!-- Left Column: Tabs & Forms -->
+      <section class="config-panel">
+        <nav class="tabs-nav">
+          <button class="tab-btn active" data-tab="hardware">⚙️ Hardware & Rede</button>
+          <button class="tab-btn" data-tab="stepgens">Motores (Step/Dir)</button>
+          <button class="tab-btn" data-tab="encoders">Encoders</button>
+          <button class="tab-btn" data-tab="inputs">Entradas</button>
+          <button class="tab-btn" data-tab="outputs">Saídas</button>
+          <button class="tab-btn" data-tab="pwm">PWM / Spindle</button>
+        </nav>
+
+        <!-- Global Pin Filter Bar -->
+        <div class="pin-filter-bar">
+          <div class="pin-filter-left">
+            <span class="pin-filter-icon"></span>
+            <label for="pinDisplayFilter"><strong>Filtro de Pinos nos Menus:</strong></label>
+          </div>
+          <select id="pinDisplayFilter" class="pin-filter-select">
+            <option value="all">Mostrar Todos os Pinos (em uso destacados em amarelo)</option>
+            <option value="available">Mostrar Apenas Pinos Disponíveis / Livres</option>
+          </select>
+        </div>
+
+        <div class="tab-content">
+          <!-- Hardware & Network Tab -->
+          <div id="tab-hardware" class="tab-pane active">
+            <div class="pane-header">
+              <h3>Plataforma e Comunicação</h3>
+            </div>
+
+            <div class="card hardware-card">
+              <h4>1. Escolha do Microcontrolador (MCU)</h4>
+              <div class="radio-cards">
+                <label class="radio-card active" id="labelMcuPico">
+                  <input type="radio" name="mcuChoice" value="pico" checked>
+                  <div class="radio-card-content">
+                    <span class="radio-title">RP2040 (Raspberry Pi Pico)</span>
+                    <span class="radio-desc">Dual Cortex-M0+ @ 133/200MHz, 8 State Machines PIO</span>
+                  </div>
+                </label>
+                <label class="radio-card" id="labelMcuPico2">
+                  <input type="radio" name="mcuChoice" value="pico2">
+                  <div class="radio-card-content">
+                    <span class="radio-title">RP2350 (Raspberry Pi Pico 2)</span>
+                    <span class="radio-desc">Dual Cortex-M33 / Hazard3 @ 150/200MHz, 12 State Machines PIO</span>
+                  </div>
+                </label>
+              </div>
+
+              <h4 style="margin-top: 20px;">2. Modo de Comunicação</h4>
+              <div class="radio-cards">
+                <label class="radio-card active" id="labelTransEth">
+                  <input type="radio" name="transportChoice" value="0" checked>
+                  <div class="radio-card-content">
+                    <span class="radio-title">🌐 Ethernet UDP (WIZnet)</span>
+                    <span class="radio-desc">Comunicação isolada via rede com PC ou Raspberry Pi</span>
+                  </div>
+                </label>
+                <label class="radio-card" id="labelTransSpi">
+                  <input type="radio" name="transportChoice" value="1">
+                  <div class="radio-card-content">
+                    <span class="radio-title">Raspberry Pi SPI Direto (bcm2835)</span>
+                    <span class="radio-desc">Conexão direta GPIO SPI sem overhead de rede (libera GP20/GP21)</span>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Hardware SPI Bus Selection -->
+              <div id="spiBusSection" style="margin-top: 20px;">
+                <h4>3. Barramento SPI de Hardware do Pico</h4>
+                <div class="radio-cards small-cards">
+                  <label class="radio-card active" id="labelSpi0">
+                    <input type="radio" name="spiInstanceChoice" value="0" checked>
+                    <div class="radio-card-content">
+                      <span class="radio-title">SPI0</span>
+                      <span class="radio-desc">Instância nativa 0 do RP2040/RP2350</span>
+                    </div>
+                  </label>
+                  <label class="radio-card" id="labelSpi1">
+                    <input type="radio" name="spiInstanceChoice" value="1">
+                    <div class="radio-card-content">
+                      <span class="radio-title">SPI1</span>
+                      <span class="radio-desc">Instância nativa 1 do RP2040/RP2350</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="form-group" style="margin-top: 14px;">
+                  <label for="spiPinPreset">Preset de Pinos do Barramento SPI:</label>
+                  <select id="spiPinPreset" style="width: 100%;">
+                    <option value="spi0_pico_w">SPI0 (Pico / Pico 2W): MISO=Pino 1 (GP0), CS=Pino 2 (GP1), SCK=Pino 4
+                      (GP2), MOSI=Pino 5 (GP3) | RESET=Pino 6 (GP4), INT=Pino 7 (GP5)</option>
+                    <option value="spi0_def">SPI0 Padrão: MISO=Pino 21 (GP16), CS=Pino 22 (GP17), SCK=Pino 24 (GP18),
+                      MOSI=Pino 25 (GP19) | RESET=Pino 26 (GP20), INT=Pino 27 (GP21)</option>
+                    <option value="spi0_alt_b">SPI0 Alternativo B: MISO=Pino 6 (GP4), CS=Pino 7 (GP5), SCK=Pino 9 (GP6),
+                      MOSI=Pino 10 (GP7) | RESET=Pino 11 (GP8), INT=Pino 12 (GP9)</option>
+                    <option value="spi1_def">SPI1 Padrão: MISO=Pino 11 (GP8), CS=Pino 12 (GP9), SCK=Pino 14 (GP10),
+                      MOSI=Pino 15 (GP11) | RESET=Pino 16 (GP12), INT=Pino 17 (GP13)</option>
+                    <option value="spi1_alt_a">SPI1 Alternativo A: MISO=Pino 16 (GP12), CS=Pino 17 (GP13), SCK=Pino 19
+                      (GP14), MOSI=Pino 20 (GP15) | RESET=Pino 26 (GP20), INT=Pino 29 (GP22)</option>
+                    <option value="spi1_alt_b">SPI1 Alternativo B: MISO=Pino 34 (GP28), CS=Pino 29 (GP22), SCK=Pino 31
+                      (GP26), MOSI=Pino 32 (GP27) | RESET=Pino 27 (GP21), INT=Pino 26 (GP20)</option>
+                    <option value="custom">Personalizado (Definição Manual dos Pinos)</option>
+                  </select>
+                </div>
+
+                <!-- Individual Selectors for SPI lines (MISO, CS, SCK, MOSI, RESET, INT) -->
+                <div id="spiCustomPinsGrid" class="form-grid" style="margin-top: 14px;">
+                  <div class="form-group">
+                    <label for="spiMisoPin">Pino MISO (RX):</label>
+                    <select id="spiMisoPin" class="pin-select"></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="spiCsPin">Pino CS (Chip Select):</label>
+                    <select id="spiCsPin" class="pin-select"></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="spiSckPin">Pino SCK (Clock):</label>
+                    <select id="spiSckPin" class="pin-select"></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="spiMosiPin">Pino MOSI (TX):</label>
+                    <select id="spiMosiPin" class="pin-select"></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="spiResetPin">Pino RESET (Reset W5500/W5100S):</label>
+                    <select id="spiResetPin" class="pin-select"></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="spiIntPin">Pino INT (Interrupção):</label>
+                    <select id="spiIntPin" class="pin-select"></select>
+                  </div>
+                </div>
+                <small style="color: #94a3b8; margin-top: 6px; display: block;">
+                  Os pinos selecionados para o SPI são reservados e destacados no diagrama. Os demais pinos ficam
+                  totalmente livres para motores de passo, encoders, entradas e saídas.
+                </small>
+              </div>
+
+              <!-- Ethernet Chip Selection (Only if Ethernet selected) -->
+              <div id="wizchipSection" style="margin-top: 20px;">
+                <h4>4. Chip Ethernet WIZnet</h4>
+                <div class="radio-cards small-cards">
+                  <label class="radio-card active" id="labelWiz5500">
+                    <input type="radio" name="wizchipChoice" value="W5500" checked>
+                    <div class="radio-card-content">
+                      <span class="radio-title">W5500</span>
+                      <span class="radio-desc">Buffer 32KB, SPI de alta velocidade (padrão)</span>
+                    </div>
+                  </label>
+                  <label class="radio-card" id="labelWiz5100s">
+                    <input type="radio" name="wizchipChoice" value="W5100S">
+                    <div class="radio-card-content">
+                      <span class="radio-title">W5100S</span>
+                      <span class="radio-desc">Buffer 16KB, módulo compacto SPI</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Network IP Settings (Only if Ethernet selected) -->
+              <div id="netIpSection" style="margin-top: 20px;">
+                <h4>5. Parâmetros de Endereçamento IP</h4>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="netIp">Endereço IP:</label>
+                    <input type="text" id="netIp" value="192.168.0.177">
+                  </div>
+                  <div class="form-group">
+                    <label for="netGateway">Gateway:</label>
+                    <input type="text" id="netGateway" value="192.168.0.1">
+                  </div>
+                  <div class="form-group">
+                    <label for="netSubnet">Máscara:</label>
+                    <input type="text" id="netSubnet" value="255.255.255.0">
+                  </div>
+                  <div class="form-group">
+                    <label for="netPort">Porta UDP:</label>
+                    <input type="number" id="netPort" value="8888">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step Gens Tab -->
+          <div id="tab-stepgens" class="tab-pane">
+            <div class="pane-header">
+              <h3>Motores de Passo (Step Generators)</h3>
+              <button id="btnAddStepgen" class="btn btn-sm btn-outline">+ Adicionar Eixo</button>
+            </div>
+            <div class="info-callout">
+              <span class="info-icon"></span>
+              <div>
+                <strong>Regra de Hardware do Stepper Ninja:</strong>
+                Para cada eixo (X, Y, Z, A...), os pinos de <strong>Step</strong> e <strong>Dir</strong> precisam ser
+                <strong>GPIOs consecutivos</strong> no Pico (ex: GP0/GP1, GP2/GP3, GP4/GP5... ou Dir/Step invertidos:
+                GP1/GP0, GP3/GP2).
+              </div>
+            </div>
+
+            <div id="stepgenList" class="cards-list"></div>
+
+            <div class="timing-box">
+              <h4>Parâmetros de Pulso Globais</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="pulseWidth">Largura de Pulso (ns):</label>
+                  <input type="number" id="pulseWidth" value="2000" step="500" min="500" max="20000">
+                  <small>Recomendado: 2000ns a 5000ns para drivers comuns (DM542, TB6600, etc.)</small>
+                </div>
+                <div class="form-group">
+                  <label for="stepScale">Escala de Passo Padrão:</label>
+                  <input type="number" id="stepScale" value="1000" step="100">
+                  <small>Passos por milímetro ou grau (definido no HAL)</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Encoders Tab -->
+          <div id="tab-encoders" class="tab-pane">
+            <div class="pane-header">
+              <h3>Encoders de Quadratura (Feedback / Spindle)</h3>
+              <button id="btnAddEncoder" class="btn btn-sm btn-outline">+ Adicionar Encoder</button>
+            </div>
+            <p class="section-desc">Cada encoder consome 2 pinos consecutivos no Pico (Pino base = Fase A, Pino base + 1
+              = Fase B).</p>
+            <div id="encoderList" class="cards-list"></div>
+          </div>
+
+          <!-- Inputs Tab -->
+          <div id="tab-inputs" class="tab-pane">
+            <div class="pane-header">
+              <h3>Entradas Digitais (Fins de curso, Probe, E-Stop)</h3>
+              <button id="btnAddInput" class="btn btn-sm btn-outline">+ Adicionar Entrada</button>
+            </div>
+            <div class="info-callout">
+              <span class="info-icon"></span>
+              <div>
+                <strong>Nomes de Pinos no LinuxCNC HAL:</strong>
+                Defina um nome amigável para cada entrada (ex: <code>estop</code>, <code>probe</code>,
+                <code>limit_x</code>, <code>arc_ok</code>). O driver exportará os pinos HAL diretamente como
+                <code>stepper-ninja.0.&lt;nome&gt;</code> e <code>stepper-ninja.0.&lt;nome&gt;-not</code>!
+              </div>
+            </div>
+            <div id="inputList" class="cards-list"></div>
+          </div>
+
+          <!-- Outputs Tab -->
+          <div id="tab-outputs" class="tab-pane">
+            <div class="pane-header">
+              <h3>Saídas Digitais (Relés, Coolant, Enable)</h3>
+              <button id="btnAddOutput" class="btn btn-sm btn-outline">+ Adicionar Saída</button>
+            </div>
+            <div class="info-callout">
+              <span class="info-icon"></span>
+              <div>
+                <strong>Nomes de Pinos no LinuxCNC HAL:</strong>
+                Dê um nome amigável para cada saída (ex: <code>spindle</code>, <code>torch_on</code>,
+                <code>coolant</code>). O driver exportará como <code>stepper-ninja.0.&lt;nome&gt;</code>!
+              </div>
+            </div>
+            <div id="outputList" class="cards-list"></div>
+          </div>
+
+          <!-- PWM Tab -->
+          <div id="tab-pwm" class="tab-pane">
+            <div class="pane-header">
+              <h3>PWM / Controle de Spindle 0-10V / Laser</h3>
+            </div>
+            <div class="card">
+              <div class="form-group checkbox-group">
+                <input type="checkbox" id="usePwm">
+                <label for="usePwm"><strong>Habilitar Saída PWM</strong></label>
+              </div>
+              <div id="pwmSettings" class="form-grid">
+                <div class="form-group">
+                  <label for="pwmPin">Pino de Saída PWM:</label>
+                  <select id="pwmPin" class="pin-select"></select>
+                </div>
+                <div class="form-group">
+                  <label for="pwmFreq">Frequência Base (Hz):</label>
+                  <input type="number" id="pwmFreq" value="10000" min="2000" max="1000000">
+                </div>
+                <div class="form-group">
+                  <label for="pwmMaxscale">Escala Máxima (Wrap):</label>
+                  <input type="number" id="pwmMaxscale" value="4096">
+                </div>
+                <div class="form-group checkbox-group">
+                  <input type="checkbox" id="pwmInvert">
+                  <label for="pwmInvert">Inverter Sinal PWM</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Pinout Diagram & Code Preview -->
+      <section class="visual-panel">
+        <div class="panel-card pinout-card">
+          <div class="panel-header">
+            <h3>Diagrama de Pinagem: <span id="mcuBadgeHeader">RP2040</span></h3>
+            <span class="badge" id="transportBadgeHeader">Ethernet W5500</span>
+          </div>
+
+          <div class="pinout-legend">
+            <span class="legend-item"><span class="legend-dot step"></span>Step/Dir</span>
+            <span class="legend-item"><span class="legend-dot enc"></span>Encoder</span>
+            <span class="legend-item"><span class="legend-dot in"></span>Entrada</span>
+            <span class="legend-item"><span class="legend-dot out"></span>Saída</span>
+            <span class="legend-item"><span class="legend-dot pwm"></span>PWM</span>
+            <span class="legend-item"><span class="legend-dot w5500" id="legendSpiDot"></span><span
+                id="legendSpiText">W5500 SPI</span></span>
+            <span class="legend-item"><span class="legend-dot free"></span>Livre</span>
+          </div>
+
+          <!-- Interactive Pico Board -->
+          <div class="pico-board-wrapper">
+            <div class="pico-board">
+              <div class="board-top">
+                <div class="usb-port">USB</div>
+                <div class="board-label" id="boardChipLabel">RP2040 PICO</div>
+              </div>
+
+              <div class="board-body">
+                <div class="pins-column left" id="leftPins"></div>
+                <div class="chip-center">
+                  <div class="chip-soc" id="chipSocName">RP2040</div>
+                  <div class="chip-sub" id="chipSocSub">Dual Core ARM</div>
+                </div>
+                <div class="pins-column right" id="rightPins"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Code Preview Box -->
+        <div class="panel-card code-card">
+          <div class="panel-header">
+            <h3>Preview de Código C (<span id="previewFilename">board_custom.h</span>)</h3>
+            <button id="btnCopyCode" class="btn btn-sm btn-outline">Copiar Código</button>
+          </div>
+          <pre><code id="codePreview">// Carregando...</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal de Compilação -->
+    <div id="buildModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="buildModalTitle">Compilando Firmware...</h3>
+          <button id="btnCloseModal" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="buildSpinner" class="spinner-container">
+            <div class="spinner"></div>
+            <p id="buildModalSubtitle">Compilando com CMake e GCC ARM Toolchain...</p>
+          </div>
+          <div id="buildSuccessBox" class="build-success-box hidden">
+            <div>
+              <h4 style="color: #4ade80; font-size: 1.15rem; margin-bottom: 8px;">Pacote Gerado com Sucesso!</h4>
+              <p style="color: #cbd5e1; font-size: 0.9rem; margin-bottom: 12px;">
+                O firmware do Pico e os drivers do LinuxCNC foram compilados e salvos na pasta:
+              </p>
+              <div class="dist-folder-banner">
+                <span class="dist-folder-label">Pasta:</span>
+                <code id="distFolderPath">stepper-ninja/dist/</code>
+                <button id="btnOpenDistFolder" type="button" class="btn btn-xs btn-outline"
+                  onclick="openDistFolder()">Abrir Pasta</button>
+              </div>
+
+              <div class="dist-files-list">
+                <div class="dist-file-item">
+                  <span class="file-badge badge-pico">Pico UF2</span>
+                  <div class="dist-file-info">
+                    <strong id="buildTargetName">stepper-ninja-pico-W5500.uf2</strong>
+                    <span id="buildFileSize" class="file-meta">0 KB</span>
+                  </div>
+                  <a id="btnDownloadUf2" class="btn btn-xs btn-primary" href="/api/download/uf2"
+                    download="stepper-ninja.uf2">Baixar .uf2</a>
+                </div>
+
+                <div class="dist-file-item">
+                  <span class="file-badge badge-linuxcnc">LinuxCNC</span>
+                  <div class="dist-file-info">
+                    <strong id="distDriverNames">stepgen-ninja.so & stepper-ninja.so</strong>
+                    <span class="file-meta">Módulos RTAPI do LinuxCNC</span>
+                  </div>
+                  <span class="file-tag">Pronto</span>
+                </div>
+
+                <div class="dist-file-item">
+                  <span class="file-badge badge-script">Instalador</span>
+                  <div class="dist-file-info">
+                    <strong>install_driver.sh & LEIAME.txt</strong>
+                    <span class="file-meta">Instalação com 1 comando em outro PC</span>
+                  </div>
+                  <span class="file-tag">Pronto</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <details id="buildLogDetails" class="build-log-details">
+            <summary id="buildLogSummary" class="build-log-summary">📋 Ver log detalhado do compilador</summary>
+            <pre id="buildOutput" class="build-log"></pre>
+          </details>
+        </div>
+        <div class="modal-footer">
+          <button id="btnDismissBuild" class="btn btn-secondary">Fechar</button>
+          <a id="btnDownloadZip" class="btn btn-success" href="/api/download/zip" download="stepper-ninja-pacote.zip">
+            Baixar Pacote Completo (.zip)
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

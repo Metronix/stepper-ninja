@@ -11,7 +11,7 @@ set -euo pipefail
 #   THREAD_NAME      (default: servo-thread)
 #   THREAD_PERIOD_NS (default: 1000000)
 
-IP_ADDRESS="${1:-${IP_ADDRESS:-192.168.0.177:8888}}"
+IP_ADDRESS="${1:-${IP_ADDRESS:-192.168.69.160:8888}}"
 THREAD_NAME="${THREAD_NAME:-servo-thread}"
 THREAD_PERIOD_NS="${THREAD_PERIOD_NS:-1000000}"
 

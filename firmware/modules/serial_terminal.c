@@ -76,6 +76,7 @@ void process_command(char* command) {
         printf("help - Show this help message\n");
         printf("check - Show current configuration\n");
         printf("ip <x.x.x.x> - Set IP address\n");
+        printf("subnet <x.x.x.x> - Set subnet mask\n");
         printf("gateway <x.x.x.x> - Set the gateway address\n");
         printf("port <port> - Set port\n");
         printf("mac <xx:xx:xx:xx:xx:xx> - Set MAC address\n");
@@ -185,6 +186,23 @@ void process_command(char* command) {
         }
         else {
             printf("Invalid Gateway format\n");
+        }
+    } 
+    else if (strcmp(command, "subnet") == 0) {
+        printf("Subnet: %d.%d.%d.%d\n", net_info.sn[0], net_info.sn[1], net_info.sn[2], net_info.sn[3]);
+    }
+    else if (strncmp(command, "subnet ", 7) == 0) {
+        int sn0, sn1, sn2, sn3;
+        if (sscanf(command, "subnet %d.%d.%d.%d", &sn0, &sn1, &sn2, &sn3) == 4) {
+            net_info.sn[0] = sn0;
+            net_info.sn[1] = sn1;
+            net_info.sn[2] = sn2;
+            net_info.sn[3] = sn3;
+            save_configuration();
+            printf("Subnet changed to %d.%d.%d.%d\n", sn0, sn1, sn2, sn3);
+        }
+        else {
+            printf("Invalid Subnet format\n");
         }
     } 
     else if (strncmp(command, "mac ", 4) == 0) {

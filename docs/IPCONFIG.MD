@@ -42,6 +42,8 @@ The serial terminal accepts commands typed into the terminal, terminated by a ca
 | `check` | Shows the current configuration, including MAC, IP, subnet, gateway, DNS, DHCP status, port, PHY status (duplex/speed), and timeout. | `check` | Prints detailed configuration details, e.g., `IP: 192.168.1.100`. |
 | `ip <x.x.x.x>` | Sets the device's IP address to the specified value. | `ip 192.168.1.100` | Updates IP and saves to configuration. Prints `IP changed to 192.168.1.100`. |
 | `ip` | Displays the current IP address. | `ip` | Prints `IP: 192.168.1.100`. |
+| `subnet <x.x.x.x>` | Sets the device's subnet mask to the specified value. | `subnet 255.255.252.0` | Updates subnet mask and saves to configuration. Prints `Subnet changed to 255.255.252.0`. |
+| `subnet` | Displays the current subnet mask. | `subnet` | Prints `Subnet: 255.255.252.0`. |
 | `port <port>` | Sets the device's port number. | `port 5000` | Updates port and saves to configuration. Prints `Port changed to 5000`. |
 | `port` | Displays the current port number. | `port` | Prints `Port: 5000`. |
 | `mac <xx:xx:xx:xx:xx:xx>` | Sets the device's MAC address (hexadecimal, colon-separated). | `mac 00:1A:2B:3C:4D:5E` | Updates MAC and saves to configuration. Prints `MAC changed to 00:1A:2B:3C:4D:5E`. |

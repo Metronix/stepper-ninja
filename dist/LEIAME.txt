@@ -1,0 +1,21 @@
+======================================================================
+PACOTE DE DISTRIBUIÇÃO - STEPPER NINJA
+======================================================================
+Microcontrolador:  PICO2
+Módulo Ethernet:   W5500
+Gerado em:         dist/
+
+ARQUIVOS DESTE PACOTE:
+1. stepper-ninja-pico2-W5500.uf2 (Firmware do Raspberry Pi Pico)
+   - Conecte o Pico no PC segurando o botão BOOTSEL.
+   - Copie este arquivo para o drive USB 'RPI-RP2' que aparecerá.
+
+2. stepgen-ninja.so e stepper-ninja.so (Drivers LinuxCNC)
+   - Para instalar no LinuxCNC de qualquer PC, execute:
+       sudo ./install_driver.sh
+     (ou copie os arquivos .so para /usr/lib/linuxcnc/modules/)
+
+3. No seu arquivo de configuração (.hal) do LinuxCNC:
+   - Carregue o driver normalmente:
+       loadrt stepgen-ninja ip_address="192.168.0.177"
+======================================================================

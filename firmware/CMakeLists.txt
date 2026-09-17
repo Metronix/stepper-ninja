@@ -65,6 +65,7 @@ add_executable(stepper-ninja
     modules/breakoutboard_1.c
     modules/breakoutboard_2.c
     modules/breakoutboard_3.c
+    modules/breakoutboard_42.c
     modules/breakoutboard_100.c
     modules/flash_config.c
     modules/serial_terminal.c

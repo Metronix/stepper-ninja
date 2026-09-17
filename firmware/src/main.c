@@ -75,11 +75,14 @@ transmission_pico_pc_t *tx_buffer;
 
 // ==================== BREAKOUT BOARD: I/O buffers ====================
 volatile uint32_t input_buffer[4];      // Input register mirror for diagnostics / terminal
-#if breakout_board > 0
-    volatile uint32_t output_buffer;    // Breakout board output register mirror
-#else
+volatile uint32_t output_buffer;        // Breakout board output register mirror
+
+#ifdef in_pins
     const uint8_t input_pins[] = in_pins;
-    const uint8_t output_pins[] = out_pins; // Example output pins
+#endif
+
+#ifdef out_pins
+    const uint8_t output_pins[] = out_pins;
 #endif
 // =======================================================================
 
@@ -474,12 +477,12 @@ int main() {
         //                clock_get_hz(clk_sys),
         //                clock_get_hz(clk_sys));
 
-        spi_init(spi0, 40000000);
+        spi_init(SPI_PORT, 40000000);
 
         // force spi clock speed
         #if pico_clock == 125000000
-            hw_write_masked(&spi_get_hw(spi0)->cr0, (0) << SPI_SSPCR0_SCR_LSB, SPI_SSPCR0_SCR_BITS); // SCR = 0
-            hw_write_masked(&spi_get_hw(spi0)->cpsr, 4, SPI_SSPCPSR_CPSDVSR_BITS); // CPSDVSR = 4
+            hw_write_masked(&spi_get_hw(SPI_PORT)->cr0, (0) << SPI_SSPCR0_SCR_LSB, SPI_SSPCR0_SCR_BITS); // SCR = 0
+            hw_write_masked(&spi_get_hw(SPI_PORT)->cpsr, 4, SPI_SSPCPSR_CPSDVSR_BITS); // CPSDVSR = 4
         #endif
     #endif
     
@@ -514,13 +517,13 @@ int main() {
 
     dma_channel_config_tx = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_channel_config_tx, DMA_SIZE_8);
-    channel_config_set_dreq(&dma_channel_config_tx, DREQ_SPI0_TX);
+    channel_config_set_dreq(&dma_channel_config_tx, SPI_DREQ_TX);
     channel_config_set_read_increment(&dma_channel_config_tx, true);
     channel_config_set_write_increment(&dma_channel_config_tx, false);
 
     dma_channel_config_rx = dma_channel_get_default_config(dma_rx);
     channel_config_set_transfer_data_size(&dma_channel_config_rx, DMA_SIZE_8);
-    channel_config_set_dreq(&dma_channel_config_rx, DREQ_SPI0_RX);
+    channel_config_set_dreq(&dma_channel_config_rx, SPI_DREQ_RX);
     channel_config_set_read_increment(&dma_channel_config_rx, false);
     channel_config_set_write_increment(&dma_channel_config_rx, true);
 
@@ -696,13 +699,20 @@ void __time_critical_func(spi_write)(uint8_t data) {
 }
 
 int32_t __time_critical_func(_sendto)(uint8_t sn, uint8_t *buf, uint16_t len, uint8_t *addr, uint16_t port) {
-    uint16_t freesize;
-    uint32_t taddr;
+    static uint8_t last_dest_ip[4] = {0};
+    static uint16_t last_dest_port = 0;
 
-    if (first_send) {
+    if (first_send || memcmp(last_dest_ip, addr, 4) != 0 || last_dest_port != port) {
         setSn_DIPR(sn, addr);
         setSn_DPORT(sn, port);
+        memcpy(last_dest_ip, addr, 4);
+        last_dest_port = port;
         first_send = 0;
+    }
+
+    uint16_t freesize = getSn_TX_FSR(sn);
+    if (freesize < len) {
+        return SOCKERR_DATALEN;
     }
 
     wiz_send_data(sn, buf, len);
@@ -713,7 +723,7 @@ int32_t __time_critical_func(_sendto)(uint8_t sn, uint8_t *buf, uint16_t len, ui
         uint8_t tmp = getSn_IR(sn);
         if (tmp & Sn_IR_SENDOK) {
             setSn_IR(sn, Sn_IR_SENDOK);
-            break;
+            return (int32_t)len;
         } else if (tmp & Sn_IR_TIMEOUT) {
             setSn_IR(sn, Sn_IR_TIMEOUT);
             return SOCKERR_TIMEOUT;
@@ -758,18 +768,17 @@ void __not_in_flash_func(core0_wait)(void) {
 }
 
 int32_t __time_critical_func(_recvfrom)(uint8_t sn, uint8_t *buf, uint16_t len, uint8_t *addr, uint16_t *port) {
-    static uint8_t head[8];
-    static uint16_t pack_len = 0;
+    uint8_t head[8];
+    uint16_t rx_size_available = getSn_RX_RSR(sn);
 
-    while ((pack_len = getSn_RX_RSR(sn)) == 0) {
+    if (rx_size_available < 8) {
         if (getSn_SR(sn) == SOCK_CLOSED) return SOCKERR_SOCKCLOSED;
+        return 0;
     }
 
     wiz_recv_data(sn, head, 8);
     setSn_CR(sn, Sn_CR_RECV);
     while (getSn_CR(sn));
-
-    memset(addr, 0, 4);
 
     addr[0] = head[0];
     addr[1] = head[1];
@@ -778,11 +787,16 @@ int32_t __time_critical_func(_recvfrom)(uint8_t sn, uint8_t *buf, uint16_t len, 
     *port = (head[4] << 8) | head[5];
 
     uint16_t data_len = (head[6] << 8) | head[7];
+    uint16_t pack_len = (len < data_len) ? len : data_len;
 
-    if (len < data_len) pack_len = len;
-    else pack_len = data_len;
+    if (pack_len > 0) {
+        wiz_recv_data(sn, buf, pack_len);
+    }
 
-    wiz_recv_data(sn, buf, pack_len);
+    if (data_len > pack_len) {
+        wiz_recv_ignore(sn, data_len - pack_len);
+    }
+
     setSn_CR(sn, Sn_CR_RECV);
     while (getSn_CR(sn));
 
@@ -793,6 +807,8 @@ void handle_data(){
     tx_buffer->jitter = get_absolute_time() - last_packet_time;
     //printf("%d Received bytes: %d\n", rx_counter, len);
     last_packet_time = get_absolute_time();
+
+    checksum_error = 0;
 
     if (rx_buffer->packet_id != rx_counter ) {
         printf("packet loss: %d != %d  syncronizing.... \n", rx_buffer->packet_id, rx_counter);
@@ -987,31 +1003,25 @@ void stop_timer() {
 // -------------------------------------------
 void __not_in_flash_func(handle_udp)() {
     gpio_pull_up(GPIO_INT);
-    uint8_t *packet_buffer;
-    packet_buffer = malloc(SPI_TRANSFER_SIZE);
-    if (packet_buffer == NULL) {
-        printf("SPI packet buffer allocation failed\n");
-        while (1) {
-            sleep_ms(1000);
-        }
-    }
-    memset(packet_buffer, 0, SPI_TRANSFER_SIZE);
+    static uint8_t packet_buffer[SPI_TRANSFER_SIZE];
+    memset(packet_buffer, 0, sizeof(packet_buffer));
     last_packet_time = get_absolute_time();
     while (1){
         if (consume_save_config_request()) {
             save_config_to_flash();
         }
-        if (!gpio_get(GPIO_INT)){
-            #if raspberry_pi_spi == 0
-                setSn_IR(0, Sn_IR_RECV);
-                int len = _recvfrom(0, (uint8_t *)rx_buffer, rx_size, src_ip, &src_port);
-            #else 
-                memset(packet_buffer, 0, SPI_TRANSFER_SIZE);
-                memcpy(packet_buffer, (uint8_t *)tx_buffer, tx_size);
-                spi_read_fulldup(spi_rx_frame, packet_buffer, SPI_TRANSFER_SIZE);
-                memcpy((uint8_t *)rx_buffer, spi_rx_frame, rx_size);
-                int len = rx_size; // for compatibility
-            #endif
+        #if raspberry_pi_spi == 0
+        if (!gpio_get(GPIO_INT) || getSn_RX_RSR(0) >= 8) {
+            setSn_IR(0, Sn_IR_RECV);
+            int len = _recvfrom(0, (uint8_t *)rx_buffer, rx_size, src_ip, &src_port);
+        #else
+        if (!gpio_get(GPIO_INT)) {
+            memset(packet_buffer, 0, sizeof(packet_buffer));
+            memcpy(packet_buffer, (uint8_t *)tx_buffer, tx_size);
+            spi_read_fulldup(spi_rx_frame, packet_buffer, SPI_TRANSFER_SIZE);
+            memcpy((uint8_t *)rx_buffer, spi_rx_frame, rx_size);
+            int len = rx_size; // for compatibility
+        #endif
             if (len == rx_size) {
                 handle_data();
                 #if raspberry_pi_spi == 0
@@ -1036,7 +1046,7 @@ static void spi_read_fulldup(uint8_t *pBuf, uint8_t *sBuf,  uint16_t len)
 {
     channel_config_set_read_increment(&dma_channel_config_tx, true);
     channel_config_set_write_increment(&dma_channel_config_tx, false);
-    channel_config_set_dreq(&dma_channel_config_tx, DREQ_SPI0_TX);
+    channel_config_set_dreq(&dma_channel_config_tx, SPI_DREQ_TX);
     dma_channel_configure(dma_tx, &dma_channel_config_tx,
                           &spi_get_hw(SPI_PORT)->dr,
                           sBuf,
@@ -1045,7 +1055,7 @@ static void spi_read_fulldup(uint8_t *pBuf, uint8_t *sBuf,  uint16_t len)
 
     channel_config_set_read_increment(&dma_channel_config_rx, false);
     channel_config_set_write_increment(&dma_channel_config_rx, true);
-    channel_config_set_dreq(&dma_channel_config_rx, DREQ_SPI0_RX);
+    channel_config_set_dreq(&dma_channel_config_rx, SPI_DREQ_RX);
     dma_channel_configure(dma_rx, &dma_channel_config_rx,
                           pBuf,                     
                           &spi_get_hw(SPI_PORT)->dr,
@@ -1113,11 +1123,11 @@ void w5100s_init() {
 
     dma_channel_config_tx = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_channel_config_tx, DMA_SIZE_8);
-    channel_config_set_dreq(&dma_channel_config_tx, DREQ_SPI0_TX);
+    channel_config_set_dreq(&dma_channel_config_tx, SPI_DREQ_TX);
 
     dma_channel_config_rx = dma_channel_get_default_config(dma_rx);
     channel_config_set_transfer_data_size(&dma_channel_config_rx, DMA_SIZE_8);
-    channel_config_set_dreq(&dma_channel_config_rx, DREQ_SPI0_RX);
+    channel_config_set_dreq(&dma_channel_config_rx, SPI_DREQ_RX);
     channel_config_set_read_increment(&dma_channel_config_rx, false);
     channel_config_set_write_increment(&dma_channel_config_rx, true);
 
@@ -1128,12 +1138,11 @@ void w5100s_init() {
     wizchip_init(tx, rx);
 
     wiz_PhyConf phyconf;
-    phy_conf = malloc(sizeof(wiz_PhyConf));
-    wizphy_getphyconf(phy_conf);
-    phy_conf->mode = PHY_MODE_MANUAL;
-    phy_conf->speed = PHY_SPEED_100;
-    phy_conf->duplex = PHY_DUPLEX_FULL;
-    wizphy_setphyconf(phy_conf);
+    wizphy_getphyconf(&phyconf);
+    phyconf.mode = PHY_MODE_MANUAL;
+    phyconf.speed = PHY_SPEED_100;
+    phyconf.duplex = PHY_DUPLEX_FULL;
+    wizphy_setphyconf(&phyconf);
     wizchip_setnetinfo(&net_info);
     printf("Network Init Done\n");
     wizchip_getnetinfo(&net_info);
@@ -1158,11 +1167,10 @@ void w5100s_init() {
 // Network Init
 // -------------------------------------------
 void network_init() {
-    setSn_CR(0, Sn_CR_CLOSE);
-    setSn_CR(0, Sn_CR_OPEN);
     uint8_t sock_num = 0;
+    close(sock_num);
     socket(sock_num, Sn_MR_UDP, port, 0);
-    }
+}
 
 static void spi_read_burst(uint8_t *pBuf, uint16_t len)
 {
@@ -1179,7 +1187,7 @@ static void spi_read_burst(uint8_t *pBuf, uint16_t len)
 
     channel_config_set_read_increment(&dma_channel_config_rx, false);
     channel_config_set_write_increment(&dma_channel_config_rx, true);
-    channel_config_set_transfer_data_size(&dma_channel_config_tx, DMA_SIZE_8);
+    channel_config_set_transfer_data_size(&dma_channel_config_rx, DMA_SIZE_8);
     dma_channel_configure(dma_rx, &dma_channel_config_rx,
                           pBuf,                     
                           &spi_get_hw(SPI_PORT)->dr,
